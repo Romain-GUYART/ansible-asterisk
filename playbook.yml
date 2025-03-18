@@ -1,14 +1,15 @@
 ---
-- name: Installation d'Asterisk 
+- name: Installation et configuration d'Asterisk
   hosts: asterisk_servers
   become: yes
   vars:
     asterisk_version: 22.2.0
-    install_dir: /usr/src/asterisk
+    install_dir: /usr/local/src/asterisk
 
   tasks:
-    - name: Installation des dépendances système
+    - name: Mise à jour des paquets et installation des dépendances
       apt:
+        update_cache: yes
         name:
           - build-essential
           - libssl-dev
@@ -18,19 +19,21 @@
           - libsqlite3-dev
           - libjansson-dev
           - uuid-dev
-          - libxslt1-dev
         state: present
-        update_cache: yes
 
     - name: Création du répertoire d'installation
       file:
         path: "{{ install_dir }}"
         state: directory
+        owner: root
+        group: root
+        mode: '0755'
 
-    - name: Téléchargement des sources Asterisk
+    - name: Téléchargement des sources d'Asterisk
       get_url:
-        url: https://github.com/asterisk/asterisk/archive/refs/tags/{{ asterisk_version }}.tar.gz
+        url: "https://github.com/asterisk/asterisk/archive/refs/tags/{{ asterisk_version }}.tar.gz"
         dest: "/tmp/asterisk-{{ asterisk_version }}.tar.gz"
+        mode: '0644'
 
     - name: Extraction de l'archive
       unarchive:
@@ -39,38 +42,31 @@
         remote_src: yes
 
     - name: Configuration de la compilation
-      command: ./configure
-      args:
+      command:
+        cmd: ./configure
         chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
-
-    - name: Compilation des modules (configuration non-interactive)
-      command: make menuselect.makeopts
-      args:
-        chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
+      changed_when: false
 
     - name: Compilation et installation
-      command:
-        cmd: make -j4 install
+      make:
         chdir: "{{ install_dir }}/asterisk-{{ asterisk_version }}"
-      become: yes
+        target: install
+        params:
+          -j: 4
 
-    - name: Configuration des modules essentiels
+    - name: Création du fichier de configuration des modules
       copy:
         content: |
           [modules]
           autoload=yes
-          noload => chan_sip.so
-          load => chan_pjsip.so
         dest: /etc/asterisk/modules.conf
-      notify: redemarrer_asterisk
-
-    - name: Configuration PJSIP de base
-      template:
-        src: templates/pjsip.conf.j2
-        dest: /etc/asterisk/pjsip.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Redémarrer Asterisk
 
   handlers:
-    - name: redemarrer_asterisk
+    - name: Redémarrer Asterisk
       systemd:
         name: asterisk
         state: restarted
