@@ -71,3 +71,4 @@
         name: asterisk
         state: restarted
         enabled: yes
+
