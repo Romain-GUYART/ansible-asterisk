@@ -13,4 +13,5 @@ Ansible installé sur votre machine de contrôle
 🚀 Cloner le dépôt
 
 git clone git@github.com:Romain-GUYART/ansible-asterisk.git
+
 cd asterisk-ansible
